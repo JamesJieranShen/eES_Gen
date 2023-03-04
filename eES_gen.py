@@ -91,7 +91,7 @@ class eES_Gen:
 
         maxEventRate = np.max(self.eventRates[flavor])
         minEnergy = max(np.min(self.nuEnergyBins), nuThreshold)
-        nuEnergy = eES_Gen.rejectionSampling(lambda x: self.getEventRate(flavor, x), 
+        nuEnergy = self.rejectionSampling(lambda x: self.getEventRate(flavor, x), 
                                              minEnergy, np.max(self.nuEnergyBins), 
                                              maxEventRate)
         return flavor, nuEnergy
@@ -146,9 +146,10 @@ class eES_Gen:
                 + (gv - ga)**2 * (1 - T/nuEnergy)**2 \
                 + (ga**2 - gv**2) * (me*T/(nuEnergy**2))
         maxDiffXscn = diff_xscn(0)
-        eKE = eES_Gen.rejectionSampling(diff_xscn, eThreshold, nuEnergy, maxDiffXscn)
-        eCos = (nuEnergy + me)/nuEnergy * (eKE / (eKE + 2*me))**0.5
-        eCos = np.min([eCos, 1]) # numerical precision
+        # Max KE derivation: https://courses.physics.ucsd.edu/2017/Spring/physics4e/compton.pdf
+        maxKE = 2*nuEnergy**2/(me + 2*nuEnergy)
+        eKE = self.rejectionSampling(diff_xscn, eThreshold, maxKE, maxDiffXscn) 
+        eCos = (nuEnergy + me) / nuEnergy * (eKE / (eKE + 2*me))**0.5 
         assert eCos >= -1 and eCos <= 1, f'eCos is {eCos}, T = {eKE}, Ev = {nuEnergy}' # sanity check, can remove
         ePhi = self.rng.uniform(0, 2*np.pi)
         eDir = np.array([np.sqrt(1 - eCos**2) * np.cos(ePhi), 
@@ -164,8 +165,7 @@ class eES_Gen:
                  'eDir': eDir}
         return event
 
-    @staticmethod
-    def rejectionSampling(func, xmin, xmax, ymax):
+    def rejectionSampling(self, func, xmin, xmax, ymax):
         """
         Performs rejection sampling on a function.
         Parameters
@@ -185,8 +185,8 @@ class eES_Gen:
         """
         nIter = 0
         while True:
-            x = np.random.uniform(xmin, xmax)
-            y = np.random.uniform(0, ymax)
+            x = self.rng.uniform(xmin, xmax)
+            y = self.rng.uniform(0, ymax)
             if y < func(x):
                 break
             nIter += 1
